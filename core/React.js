@@ -43,5 +43,4 @@ function createElement(type, props, ...children) {
 export {
   render,
   createElement,
-  createTextNode
 }
