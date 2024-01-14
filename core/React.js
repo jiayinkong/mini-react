@@ -5,11 +5,13 @@ function render(el, container) {
 
   // 2. 设置 props
   Object.keys(el.props).forEach(key => {
-    dom[key] = el.props[key]
+    if(key !== 'children') {
+      dom[key] = el.props[key]
+    }
   })
 
   // 3. 递归处理 children
-  el.children.forEach(child => {
+  el.props.children.forEach(child => {
     render(child, dom)
   })
 
@@ -23,17 +25,18 @@ function createTextNode(text) {
     type: 'TEXT_ELEMENT',
     props: {
       nodeValue: text,
+      children: []
     },
-    children: []
   }
 }
 
 function createElement(type, props, ...children) {
   return {
     type,
-    props,
-    ...props,
-    children: children.map(child => typeof child === 'string' ? createTextNode(child) : child),
+    props: {
+      ...props,
+      children: children.map(child => typeof child === 'string' ? createTextNode(child) : child),
+    },
   }
 }
 
