@@ -1,26 +1,31 @@
-// v1.2 vdom -> js object
-const textEl = {
-  type: 'TEXT_ELEMENT',
-  props: {
-    nodeValue: 'app',
-    children: []
+// v1.3 动态创建 vdom
+function createTextNode(text) {
+  return {
+    type: 'TEXT_ELEMENT',
+    props: {
+      nodeValue: text,
+      children: []
+    }
   }
 }
 
-const el = {
-  type: 'div',
-  props: {
-    id: 'app',
-    children: [textEl]
+function createElement(type, props, ...children) {
+  return {
+    type,
+    ...props,
+    children,
   }
 }
+
+const textEl = createTextNode('app')
+const App = createElement('div', { id: 'app' }, textEl)
 
 // v1.1
 // 1. 创建 dom
-const dom = document.createElement(el.type)
+const dom = document.createElement(App.type)
 
 // 2. 设置 id
-dom.id = el.props.id
+dom.id = App.id
 
 // 3. 把 dom 添加到 root
 document.querySelector('#root').append(dom)
