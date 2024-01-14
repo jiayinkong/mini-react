@@ -1,23 +1,86 @@
 // v1.4 动态创建 dom
 function render(el, container) {
-  // 1. 创建 dom
-  const dom = el.type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(el.type)
+  nextWorkOfUnit = {
+    dom: container,
+    props: {
+      children: [el]
+    }
+  }
+}
 
-  // 2. 设置 props
-  Object.keys(el.props).forEach(key => {
+
+let nextWorkOfUnit = null
+function workLoop(deadline) {
+  let shouldYeild = false
+
+  while(!shouldYeild && nextWorkOfUnit) {
+    nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit)
+    shouldYeild = deadline.timeRemaining() < 1
+  }
+
+  requestIdleCallback(workLoop)
+}
+
+function createDom(type) {
+  return type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(type)
+}
+
+function updateProps(dom, props) {
+  Object.keys(props).forEach(key => {
     if(key !== 'children') {
-      dom[key] = el.props[key]
+      dom[key] = props[key]
     }
   })
-
-  // 3. 递归处理 children
-  el.props.children.forEach(child => {
-    render(child, dom)
-  })
-
-  // 4. 添加 dom 到 container
-  container.append(dom)
 }
+
+function initChildren(fiber) {
+  let prevChild = null
+  const children = fiber.props.children
+  children.forEach((child, index) => {
+    const newFiber = {
+      type: child.type,
+      props: child.props,
+      parent: fiber,
+      child: null,
+      sibling: null,
+      dom: null,
+    }
+    if(index === 0) {
+      fiber.child = newFiber
+    } else {
+      prevChild.sibling = newFiber
+    }
+    prevChild = newFiber
+  })
+}
+
+function performWorkOfUnit(fiber) {
+  if(!fiber.dom) {
+    // 1. 创建DOM
+    const dom = (fiber.dom = createDom(fiber.type))
+      // 把 dom 添加到 parent
+    fiber.parent.dom.append(dom)
+
+    // 2. 设置 props
+    updateProps(dom, fiber.props)
+  }
+
+  // 3. 转换链表结构
+  initChildren(fiber)
+
+  // 4. 返回下一个work
+  if(fiber.child) {
+    return fiber.child
+  }
+
+  if(fiber.sibling) {
+    return fiber.sibling
+  }
+
+  return fiber.parent?.sibling
+}
+
+requestIdleCallback(workLoop)
 
 // v1.3 动态创建 vdom
 function createTextNode(text) {
