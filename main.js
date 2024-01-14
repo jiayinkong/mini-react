@@ -4,14 +4,15 @@ function createTextNode(text) {
     type: 'TEXT_ELEMENT',
     props: {
       nodeValue: text,
-      children: []
-    }
+    },
+    children: []
   }
 }
 
 function createElement(type, props, ...children) {
   return {
     type,
+    props,
     ...props,
     children,
   }
@@ -20,19 +21,23 @@ function createElement(type, props, ...children) {
 const textEl = createTextNode('app')
 const App = createElement('div', { id: 'app' }, textEl)
 
-// v1.1
-// 1. 创建 dom
-const dom = document.createElement(App.type)
+// v1.4 动态创建 dom
+function render(el, container) {
+  // 1. 创建 dom
+  const dom = el.type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(el.type)
 
-// 2. 设置 id
-dom.id = App.id
+  // 2. 设置 props
+  Object.keys(el.props).forEach(key => {
+    dom[key] = el.props[key]
+  })
 
-// 3. 把 dom 添加到 root
-document.querySelector('#root').append(dom)
+  // 3. 递归处理 children
+  el.children.forEach(child => {
+    render(child, dom)
+  })
 
-// 4. 创建 textNode
-const textNode = document.createTextNode('')
-textNode.nodeValue = textEl.props.nodeValue
+  // 4. 添加 dom 到 container
+  container.append(dom)
+}
 
-// 5. textNode 添加到 dom
-dom.append(textNode)
+render(App, document.querySelector('#root'))
