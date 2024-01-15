@@ -37,7 +37,17 @@ function commitRoot() {
 
 function commitWork(fiber) {
   if(!fiber) return
-  fiber.parent.dom.append(fiber.dom)
+
+  let fiberParent = fiber.parent
+  // 使用 while 解决嵌套组件没有dom的问题
+  while(!fiberParent.dom) {
+    fiberParent = fiberParent.parent
+  }
+
+  if(fiber.dom) {
+    fiberParent.dom.append(fiber.dom)
+  }
+
   commitWork(fiber.child)
   commitWork(fiber.sibling)
 }
@@ -54,9 +64,8 @@ function updateProps(dom, props) {
   })
 }
 
-function initChildren(fiber) {
+function initChildren(fiber, children) {
   let prevChild = null
-  const children = fiber.props.children
   children.forEach((child, index) => {
     const newFiber = {
       type: child.type,
@@ -76,29 +85,36 @@ function initChildren(fiber) {
 }
 
 function performWorkOfUnit(fiber) {
-  if(!fiber.dom) {
-    // 1. 创建DOM
-    const dom = (fiber.dom = createDom(fiber.type))
-    // 把 dom 添加到 parent
-    // fiber.parent.dom.append(dom)
-
-    // 2. 设置 props
-    updateProps(dom, fiber.props)
+  const isFunctionComponent = typeof fiber.type === 'function'
+  // 1. 创建DOM的条件
+  if(!isFunctionComponent) {
+    if(!fiber.dom) {
+      // 1. 创建DOM
+      const dom = (fiber.dom = createDom(fiber.type))
+  
+      // 2. 设置 props
+      updateProps(dom, fiber.props)
+    }
   }
 
+  // 2. 处理children
+  const children = isFunctionComponent ? [fiber.type(fiber.props)] : fiber.props.children // 3. 处理组件嵌套问题 4. 处理组件找不到sibling问题
   // 3. 转换链表结构
-  initChildren(fiber)
+  initChildren(fiber, children)
 
   // 4. 返回下一个work
   if(fiber.child) {
     return fiber.child
   }
 
-  if(fiber.sibling) {
-    return fiber.sibling
+  // 解决多组件找不到sibling的问题，向上找到有sibling的parent节点，返回parent的sibling
+  let nextFiber = fiber
+  while(nextFiber) {
+    if(nextFiber.sibling) {
+      return nextFiber.sibling
+    }
+    nextFiber = nextFiber.parent
   }
-
-  return fiber.parent?.sibling
 }
 
 requestIdleCallback(workLoop)
@@ -115,11 +131,15 @@ function createTextNode(text) {
 }
 
 function createElement(type, props, ...children) {
+  
   return {
     type,
     props: {
       ...props,
-      children: children.map(child => typeof child === 'string' ? createTextNode(child) : child),
+      children: children.map(child => {
+        const isTextNode = typeof child === 'string' || typeof child === 'number'
+        return isTextNode ? createTextNode(child) : child
+      }),
     },
   }
 }
