@@ -6,6 +6,7 @@ function render(el, container) {
       children: [el]
     }
   }
+  root = nextWorkOfUnit
 }
 
 
@@ -18,7 +19,27 @@ function workLoop(deadline) {
     shouldYeild = deadline.timeRemaining() < 1
   }
 
+  // 当完成所有链表转化时，统一添加DOM到容器，只添加一次
+  if(!nextWorkOfUnit && root) {
+    commitRoot()
+  }
+
   requestIdleCallback(workLoop)
+}
+
+let root = null
+function commitRoot() {
+  commitWork(root.child)
+
+  // 只提交一次，提交完就置空
+  root = null
+}
+
+function commitWork(fiber) {
+  if(!fiber) return
+  fiber.parent.dom.append(fiber.dom)
+  commitWork(fiber.child)
+  commitWork(fiber.sibling)
 }
 
 function createDom(type) {
@@ -58,8 +79,8 @@ function performWorkOfUnit(fiber) {
   if(!fiber.dom) {
     // 1. 创建DOM
     const dom = (fiber.dom = createDom(fiber.type))
-      // 把 dom 添加到 parent
-    fiber.parent.dom.append(dom)
+    // 把 dom 添加到 parent
+    // fiber.parent.dom.append(dom)
 
     // 2. 设置 props
     updateProps(dom, fiber.props)
