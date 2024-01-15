@@ -84,23 +84,29 @@ function initChildren(fiber, children) {
   })
 }
 
-function performWorkOfUnit(fiber) {
-  const isFunctionComponent = typeof fiber.type === 'function'
-  // 1. 创建DOM的条件
-  if(!isFunctionComponent) {
-    if(!fiber.dom) {
-      // 1. 创建DOM
-      const dom = (fiber.dom = createDom(fiber.type))
-  
-      // 2. 设置 props
-      updateProps(dom, fiber.props)
-    }
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)]
+  initChildren(fiber, children)
+}
+
+function updateHostComponent(fiber) {
+  if(!fiber.dom) {
+    const dom = (fiber.dom = createDom(fiber.type))
+
+    updateProps(dom, fiber.props)
   }
 
-  // 2. 处理children
-  const children = isFunctionComponent ? [fiber.type(fiber.props)] : fiber.props.children // 3. 处理组件嵌套问题 4. 处理组件找不到sibling问题
-  // 3. 转换链表结构
+  const children = fiber.props.children
   initChildren(fiber, children)
+}
+
+function performWorkOfUnit(fiber) {
+  const isFunctionComponent = typeof fiber.type === 'function'
+  if(isFunctionComponent) {
+    updateFunctionComponent(fiber)
+  } else {
+    updateHostComponent(fiber)
+  }
 
   // 4. 返回下一个work
   if(fiber.child) {
