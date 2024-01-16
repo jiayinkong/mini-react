@@ -1,24 +1,11 @@
 function render(el, container) {
-  // const dom = el.type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(el.type)
-
-  // Object.keys(el.props).forEach(key => {
-  //   if(key !== 'children') {
-  //     dom[key] = el.props[key]
-  //   }
-  // })
-
-  // el.props.children.forEach(child => {
-  //   render(child, dom)
-  // })
-
-  // container.append(dom)
-
   nextWorkOfUnit = {
     dom: container,
     props: {
       children: [el],
     }
   }
+  root = nextWorkOfUnit
 }
 
 let nextWorkOfUnit = null
@@ -28,14 +15,32 @@ function workLoop(deadline) {
   while(!shouldYeild && nextWorkOfUnit) {
     nextWorkOfUnit = performWokOfUnit(nextWorkOfUnit)
     shouldYeild = deadline.timeRemaining() < 1
+
+    if(!nextWorkOfUnit) {
+      commitRoot()
+    }
+  }
+}
+
+let root = null
+function commitRoot() {
+  commitWork(root.child)
+}
+
+function commitWork(work) {
+  work.parent.dom.append(work.dom)
+
+  if(work.child) {
+    commitWork(work.child)
+  }
+  if(work.sibling) {
+    commitWork(work.sibling)
   }
 }
 
 function performWokOfUnit(work) {
   if(!work.dom) {
     const dom = work.dom = work.type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(work.type)
-
-    work.parent.dom.append(dom)
 
     Object.keys(work.props).forEach(key => {
       if(key !== 'children') {
