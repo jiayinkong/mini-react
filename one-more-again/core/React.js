@@ -15,10 +15,10 @@ function workLoop(deadline) {
   while(!shouldYeild && nextWorkOfUnit) {
     nextWorkOfUnit = performWokOfUnit(nextWorkOfUnit)
     shouldYeild = deadline.timeRemaining() < 1
+  }
 
-    if(!nextWorkOfUnit) {
-      commitRoot()
-    }
+  if(!nextWorkOfUnit) {
+    commitRoot()
   }
 }
 
@@ -28,28 +28,45 @@ function commitRoot() {
 }
 
 function commitWork(work) {
-  work.parent.dom.append(work.dom)
+  if(!work) return
+  let fiberParent = work.parent
+  // 向上找祖先节点，有 dom 属性的
+  while(!fiberParent.dom) {
+    fiberParent = fiberParent.parent
+  }
 
-  if(work.child) {
-    commitWork(work.child)
+  if(work.dom) {
+    fiberParent.dom.append(work.dom) 
   }
-  if(work.sibling) {
-    commitWork(work.sibling)
-  }
+
+  commitWork(work.child)
+  commitWork(work.sibling)
 }
 
-function performWokOfUnit(work) {
-  if(!work.dom) {
-    const dom = work.dom = work.type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(work.type)
+function createDom(type) {
+  return type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(type)
+}
 
-    Object.keys(work.props).forEach(key => {
-      if(key !== 'children') {
-        dom[key] = work.props[key]
-      }
-    })
-  }
+function updateProps(dom, props) {
+  Object.keys(props).forEach(key => {
+    if(key !== 'children') {
+      dom[key] = props[key]
+    }
+  })
+}
 
+function updateFunctionComponent(work) {
+  const children = [work.type(work.props)]
+  initChildren(work, children)
+}
+
+function updateHostComponent(work) {
   const children = work.props.children
+  initChildren(work, children)
+}
+
+function initChildren(work, children) {
+  let prevChild = null
 
   children.forEach((child, index) => {
     let newWork = {
@@ -57,10 +74,8 @@ function performWokOfUnit(work) {
       props: child.props,
       parent: work,
       sibling: null,
-      child: null
+      child: null,
     }
-
-    let prevChild = null
 
     if(index === 0) {
       work.child = newWork
@@ -69,16 +84,35 @@ function performWokOfUnit(work) {
     }
     prevChild = newWork
   })
+}
 
-  if(work.child) {
-    return work.child
+function performWokOfUnit(fiber) {
+  const isFunctionComponent = typeof fiber.type === 'function'
+
+  if(!isFunctionComponent) {
+    if(!fiber.dom) {
+      const dom = (fiber.dom = createDom(fiber.type))
+  
+      updateProps(dom, fiber.props)
+    }
+     updateHostComponent(fiber)
+  } else {
+    updateFunctionComponent(fiber)
   }
 
-  if(work.sibling) {
-    return work.sibling
+  if(fiber.child) {
+    return fiber.child
   }
 
-  return work.parent?.sibling
+  // 解决多个函数组件找不到sibling的问题
+  let nextFiber = fiber
+
+  while(nextFiber) {
+    if(nextFiber.sibling) {
+      return nextFiber.sibling
+    }
+    nextFiber = nextFiber.parent
+  }
 }
 
 requestIdleCallback(workLoop)
@@ -98,7 +132,10 @@ function createElement(type, props, ...children) {
     type,
     props: {
       ...props,
-      children: children.map(child => typeof child === 'string' ? createTextNode(child) : child),
+      children: children.map(child => {
+        const isTextNode = typeof child === 'string' || typeof child === 'number'
+        return isTextNode ? createTextNode(child) : child
+      }),
     }
   }
 }

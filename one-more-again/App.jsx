@@ -1,10 +1,14 @@
 import * as React from './core/React.js'
 
-function Counter() {
-  return <div>counter</div>
+function CounterContainer() {
+  return <Counter num={20} />
 }
 
-const App = <div>Hi, App </div>
+function Counter({ num }) {
+  return <div>counter: {num}</div>
+}
+
+const App = <div>Hi, App2<CounterContainer /> <CounterContainer /></div>
 
 
 export default App 
