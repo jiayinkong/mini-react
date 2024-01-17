@@ -1,23 +1,29 @@
 import * as React from './core/React.js'
 
-function Counter({ num }) {
-  return <div>mini-react：{num}</div>
+function Counter() {
+  return <div>mini-react</div>
 }
 
-function CounterContainer() {
+let count = 1;
+let props = { id: 'button' }
+function MyButton() {
+  function handleClick() {
+    count++
+    props = {}
+    React.update()
+  }
   return (
-    <>
-      <Counter num={10} />
-      <Counter num={20} />
-    </>
+    <div {...props}>
+      {count}
+      <button onClick={handleClick}>click</button>
+    </div>
   )
 }
 
 // 使用 jsx 语法
 const App = 
-<div>
-  hello app
-  <CounterContainer />
+<div id='app'>
+  <MyButton />
 </div>
 
 export default App

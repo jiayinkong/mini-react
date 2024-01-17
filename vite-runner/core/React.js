@@ -1,12 +1,22 @@
 // v1.4 动态创建 dom
 function render(el, container) {
-  nextWorkOfUnit = {
+  wipRoot = {
     dom: container,
     props: {
       children: [el]
     }
   }
-  root = nextWorkOfUnit
+  nextWorkOfUnit = wipRoot
+}
+
+function update() {
+  wipRoot = {
+    dom: currentRoot.dom,
+    props: currentRoot.props,
+    alternate: currentRoot,
+  }
+
+  nextWorkOfUnit = wipRoot
 }
 
 
@@ -20,19 +30,23 @@ function workLoop(deadline) {
   }
 
   // 当完成所有链表转化时，统一添加DOM到容器，只添加一次
-  if(!nextWorkOfUnit && root) {
+  if(!nextWorkOfUnit && wipRoot) {
     commitRoot()
   }
 
   requestIdleCallback(workLoop)
 }
 
-let root = null
+let wipRoot = null
+let currentRoot = null
 function commitRoot() {
-  commitWork(root.child)
+  commitWork(wipRoot.child)
+
+  // 在提交完当前的 wipRoot 之后，保存 wipRoot
+  currentRoot = wipRoot
 
   // 只提交一次，提交完就置空
-  root = null
+  wipRoot = null
 }
 
 function commitWork(fiber) {
@@ -44,8 +58,13 @@ function commitWork(fiber) {
     fiberParent = fiberParent.parent
   }
 
-  if(fiber.dom) {
-    fiberParent.dom.append(fiber.dom)
+  if(fiber.effectTag === 'update') {
+    updateProps(fiber.dom, fiber.props, fiber.alternate?.props)
+    
+  } else if(fiber.effectTag === 'placement') {
+    if(fiber.dom) {
+      fiberParent.dom.append(fiber.dom)
+    }
   }
 
   commitWork(fiber.child)
@@ -56,51 +75,99 @@ function createDom(type) {
   return type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(type)
 }
 
-function updateProps(dom, props) {
-  Object.keys(props).forEach(key => {
+function updateProps(dom, nextProps, prevProps) {
+  Object.keys(prevProps).forEach(key => {
     if(key !== 'children') {
-      dom[key] = props[key]
+      if(!(key in nextProps)) {
+        dom.removeAttribute(key)
+      }
+    }
+  })
+
+  Object.keys(nextProps).forEach(key => {
+    if(key !== 'children') {
+      if(nextProps[key] !== prevProps[key]) {
+        // 处理事件
+        if(key.startsWith('on')) {
+          const eventType = key.slice(2).toLowerCase()
+
+          dom.removeEventListener(eventType, prevProps[key])
+          dom.addEventListener(eventType, nextProps[key])
+
+        } else {
+          dom[key] = nextProps[key]
+        }
+      }
     }
   })
 }
 
-function initChildren(fiber, children) {
+function reconcileChildren(fiber, children) {
   let prevChild = null
+
+  // 设置指向旧节点的指针
+  let oldFiber = fiber.alternate?.child
+
   children.forEach((child, index) => {
-    const newFiber = {
-      type: child.type,
-      props: child.props,
-      parent: fiber,
-      child: null,
-      sibling: null,
-      dom: null,
+    const isSameType = oldFiber && oldFiber.type === child.type
+    let newFiber
+
+    if(isSameType) {
+      newFiber = {
+        type: child.type,
+        props: child.props,
+        parent: fiber,
+        child: null,
+        sibling: null,
+        dom: oldFiber.dom,
+        alternate: oldFiber,
+        effectTag: 'update',
+      }
+    } else {
+      newFiber = {
+        type: child.type,
+        props: child.props,
+        parent: fiber,
+        child: null,
+        sibling: null,
+        dom: null,
+        effectTag: 'placement',
+      }
     }
+
+    // 移动指针
+    if(oldFiber) {
+      oldFiber = oldFiber.sibling
+    }
+
     if(index === 0) {
       fiber.child = newFiber
     } else {
       prevChild.sibling = newFiber
     }
+
     prevChild = newFiber
   })
 }
 
 function updateFunctionComponent(fiber) {
   const children = [fiber.type(fiber.props)]
-  initChildren(fiber, children)
+  reconcileChildren(fiber, children)
 }
 
 function updateHostComponent(fiber) {
   if(!fiber.dom) {
     const dom = (fiber.dom = createDom(fiber.type))
 
-    updateProps(dom, fiber.props)
+    updateProps(dom, fiber.props, {})
   }
 
   const children = fiber.props.children
-  initChildren(fiber, children)
+  reconcileChildren(fiber, children)
 }
 
 function performWorkOfUnit(fiber) {
+  // debugger
   const isFunctionComponent = typeof fiber.type === 'function'
   if(isFunctionComponent) {
     updateFunctionComponent(fiber)
@@ -153,4 +220,5 @@ function createElement(type, props, ...children) {
 export {
   render,
   createElement,
+  update,
 }
