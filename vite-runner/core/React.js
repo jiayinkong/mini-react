@@ -39,14 +39,29 @@ function workLoop(deadline) {
 
 let wipRoot = null
 let currentRoot = null
+let deletions = []
 function commitRoot() {
+  // 移除旧节点
+  deletions.forEach(commitDeletions)
   commitWork(wipRoot.child)
-
   // 在提交完当前的 wipRoot 之后，保存 wipRoot
   currentRoot = wipRoot
-
   // 只提交一次，提交完就置空
   wipRoot = null
+  // 清空旧节点集合
+  deletions = []
+}
+
+function commitDeletions(fiber) {
+  if(fiber.dom) {
+    let fiberParent = fiber.parent
+    while(!fiberParent.dom) {
+      fiberParent = fiberParent.parent
+    }
+    fiberParent.dom.removeChild(fiber.dom)
+  } else {
+    commitDeletions(fiber.child)
+  }
 }
 
 function commitWork(fiber) {
@@ -124,6 +139,9 @@ function reconcileChildren(fiber, children) {
         effectTag: 'update',
       }
     } else {
+      if(oldFiber) {
+        deletions.push(oldFiber)
+      }
       newFiber = {
         type: child.type,
         props: child.props,

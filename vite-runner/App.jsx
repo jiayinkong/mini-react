@@ -1,20 +1,19 @@
 import * as React from './core/React.js'
 
-function Counter() {
-  return <div>mini-react</div>
-}
-
-let count = 1;
-let props = { id: 'button' }
+let showBar = false
 function MyButton() {
   function handleClick() {
-    count++
-    props = {}
+    showBar = !showBar
     React.update()
   }
+
+  function Foo() {
+    return <div>foo</div>
+  }
+  const bar = <p>bar</p>
   return (
-    <div {...props}>
-      {count}
+    <div>
+      <div>{showBar ? bar : <Foo />}</div>
       <button onClick={handleClick}>click</button>
     </div>
   )
