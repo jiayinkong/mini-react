@@ -48,13 +48,15 @@ function commitRoot() {
   currentRoot = wipRoot
   // 只提交一次，提交完就置空
   wipRoot = null
-  // 清空旧节点集合
+  // 完成一次提交，需要清空这一轮的旧节点集合
   deletions = []
 }
 
 function commitDeletions(fiber) {
   if(fiber.dom) {
     let fiberParent = fiber.parent
+
+    // 函数组件vdom没有 dom 属性，需要向上查找带有dom属性的祖先节点
     while(!fiberParent.dom) {
       fiberParent = fiberParent.parent
     }
@@ -142,14 +144,17 @@ function reconcileChildren(fiber, children) {
       if(oldFiber) {
         deletions.push(oldFiber)
       }
-      newFiber = {
-        type: child.type,
-        props: child.props,
-        parent: fiber,
-        child: null,
-        sibling: null,
-        dom: null,
-        effectTag: 'placement',
+      // 处理 edge case
+      if(child) {
+        newFiber = {
+          type: child.type,
+          props: child.props,
+          parent: fiber,
+          child: null,
+          sibling: null,
+          dom: null,
+          effectTag: 'placement',
+        }
       }
     }
 
@@ -164,8 +169,17 @@ function reconcileChildren(fiber, children) {
       prevChild.sibling = newFiber
     }
 
-    prevChild = newFiber
+    // 处理 edge case
+    if(newFiber) {
+      prevChild = newFiber
+    }
   })
+
+  // 新的比老的少，删除多出来的
+  while(oldFiber) {
+    deletions.push(oldFiber)
+    oldFiber = oldFiber.sibling
+  }
 }
 
 function updateFunctionComponent(fiber) {

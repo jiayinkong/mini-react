@@ -1,20 +1,20 @@
 import * as React from './core/React.js'
 
 let showBar = false
-function MyButton() {
+function Counter() {
+  // const foo = <div>foo<div>child1</div><div>child2</div></div>
+  const bar = <div>bar</div>
+
   function handleClick() {
     showBar = !showBar
     React.update()
   }
 
-  function Foo() {
-    return <div>foo</div>
-  }
-  const bar = <p>bar</p>
   return (
     <div>
-      <div>{showBar ? bar : <Foo />}</div>
-      <button onClick={handleClick}>click</button>
+      Counter 
+      <button onClick={handleClick}>showBar</button>
+      {showBar && bar}
     </div>
   )
 }
@@ -22,7 +22,8 @@ function MyButton() {
 // 使用 jsx 语法
 const App = 
 <div id='app'>
-  <MyButton />
+  hi-mini-react
+  <Counter />
 </div>
 
 export default App
