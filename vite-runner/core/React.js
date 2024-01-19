@@ -10,13 +10,18 @@ function render(el, container) {
 }
 
 function update() {
-  wipRoot = {
-    dom: currentRoot.dom,
-    props: currentRoot.props,
-    alternate: currentRoot,
-  }
 
-  nextWorkOfUnit = wipRoot
+  const currentFiber = wipFiber
+
+  return () => {
+
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber,
+    }
+  
+    nextWorkOfUnit = wipRoot
+  }
 }
 
 
@@ -26,6 +31,11 @@ function workLoop(deadline) {
 
   while(!shouldYeild && nextWorkOfUnit) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit)
+
+    // if(wipFiber?.sibling?.type === nextWorkOfUnit?.type) {
+    //   nextWorkOfUnit = undefined
+    // }
+    
     shouldYeild = deadline.timeRemaining() < 1
   }
 
@@ -40,6 +50,7 @@ function workLoop(deadline) {
 let wipRoot = null
 let currentRoot = null
 let deletions = []
+let wipFiber = null
 function commitRoot() {
   // 移除旧节点
   deletions.forEach(commitDeletions)
@@ -183,6 +194,10 @@ function reconcileChildren(fiber, children) {
 }
 
 function updateFunctionComponent(fiber) {
+  wipFiber = fiber
+  stateHooks = []
+  stateHookIndex = 0
+
   const children = [fiber.type(fiber.props)]
   reconcileChildren(fiber, children)
 }
@@ -249,8 +264,37 @@ function createElement(type, props, ...children) {
   }
 }
 
+let stateHooks
+let stateHookIndex
+function useState(initial) {
+  const currentFiber = wipFiber
+  const oldHook = currentFiber.alternate?.stateHooks[stateHookIndex]
+  
+  const stateHook = {
+    state: oldHook ? oldHook.state : initial,
+  }
+
+  stateHooks.push(stateHook)
+  stateHookIndex++
+  currentFiber.stateHooks = stateHooks
+
+  const setState = (action) => {
+    stateHook.state = action(stateHook.state)
+
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber,
+    }
+  
+    nextWorkOfUnit = wipRoot
+  }
+
+  return [stateHook.state, setState]
+}
+
 export {
   render,
   createElement,
   update,
+  useState,
 }
