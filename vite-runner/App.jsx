@@ -40,7 +40,7 @@ function TestUsetate() {
 
   function handleClick() {
     setCount(c => c + 1)
-    setBar(c => c + '!')
+    setBar('bar!')
   }
 
   return (
