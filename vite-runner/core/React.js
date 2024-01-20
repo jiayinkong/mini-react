@@ -10,7 +10,7 @@ function render(el, container) {
 }
 
 function update() {
-
+  // wipFiber 为 当前函数组件VDOM树
   const currentFiber = wipFiber
 
   return () => {
@@ -24,7 +24,6 @@ function update() {
   }
 }
 
-
 let nextWorkOfUnit = null
 function workLoop(deadline) {
   let shouldYeild = false
@@ -32,10 +31,12 @@ function workLoop(deadline) {
   while(!shouldYeild && nextWorkOfUnit) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit)
 
-    // if(wipFiber?.sibling?.type === nextWorkOfUnit?.type) {
-    //   nextWorkOfUnit = undefined
-    // }
-    
+    // 当到达一颗函数组件VDOM树的尾部，来到该函数组件的兄弟节点（兄弟节点尚未进入下一轮循环执行 performWorkOfUnit 更新）
+    if(wipRoot?.sibling?.type === nextWorkOfUnit?.type) {
+      // 设置下一个任务为 undefined，不再往下对不在此颗树内的其他组件做处理
+      nextWorkOfUnit = undefined
+    }
+
     shouldYeild = deadline.timeRemaining() < 1
   }
 
@@ -198,9 +199,7 @@ function reconcileChildren(fiber, children) {
         effectTag: 'update',
       }
     } else {
-      if(oldFiber) {
-        deletions.push(oldFiber)
-      }
+
       // 处理 edge case
       if(child) {
         newFiber = {
@@ -212,6 +211,10 @@ function reconcileChildren(fiber, children) {
           dom: null,
           effectTag: 'placement',
         }
+      }
+
+      if(oldFiber) {
+        deletions.push(oldFiber)
       }
     }
 

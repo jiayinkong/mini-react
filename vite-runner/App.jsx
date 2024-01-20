@@ -1,89 +1,77 @@
 import * as React from './core/React.js'
 
-let fooCount = 1;
+function Counter() {
+  return <div>mini-react</div>
+}
+
+// 使用 jsx 语法
+// const App = 
+// <div id='app'>
+//   <MyButton />
+// </div>
+
+let fooCount = 1
 function Foo() {
-  console.log('foo return')
+  console.log('Foo return')
+
   const update = React.update()
+
   function handleClick() {
     fooCount++
     update()
     // React.update()
   }
   return (
-    <div id='foo'>
+    <div id="foo">
       {fooCount}
       <button onClick={handleClick}>foo click</button>
     </div>
   )
 }
 
-let barCount = 1;
+let barCount = 1
 function Bar() {
-  console.log('bar return')
+  console.log('Bar return')
+
   const update = React.update()
+
   function handleClick() {
     barCount++
-    update()
     // React.update()
+    update()
   }
   return (
-    <div id='bar'>
+    <div id="bar">
       {barCount}
       <button onClick={handleClick}>bar click</button>
     </div>
   )
 }
 
-function TestUsetate() {
-  const [count, setCount] = React.useState(10)
-  const [bar, setBar] = React.useState('bar')
-
-  function handleClick() {
-    setCount(c => c + 1)
-    setBar('bar!')
-  }
-
-  // React.useEffect(() => {
-  //   console.log('init')
-  // }, [])
-
-  // React.useEffect(() => {
-  //   console.log('update')
-  // }, [count])
-
-  React.useEffect(() => {
-    return () => {
-      console.log('clearup')
-    }
-  }, [count])
-
-  return (
-    <div>
-      {count}
-      <div>{bar}</div>
-      <div>
-        <button onClick={handleClick}>click</button>
-      </div>
-    </div>
-  )
-}
-
-let appCount = 1;
+let appCount = 1
+let showBar = false
 function App() {
-  console.log('app return')
+  console.log('App return')
+
   const update = React.update()
+
   function handleClick() {
     appCount++
-    update()
+    showBar = !showBar
     // React.update()
+    update()
   }
+  const foo = <div>foo<div>child1</div><p>child2</p></div>
+  const bar = <p>foo</p>
   return (
-    <div id='app'>
+    <div id="app">
       {appCount}
-      <button onClick={handleClick}>app click</button>
+      <button onClick={handleClick}>click</button>
+      {showBar && bar}
       <Foo />
       <Bar />
-      <TestUsetate />
+      {/* {showBar ? bar : foo} */}
+      {showBar && bar}
     </div>
   )
 }
