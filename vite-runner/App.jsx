@@ -43,6 +43,20 @@ function TestUsetate() {
     setBar('bar!')
   }
 
+  // React.useEffect(() => {
+  //   console.log('init')
+  // }, [])
+
+  // React.useEffect(() => {
+  //   console.log('update')
+  // }, [count])
+
+  React.useEffect(() => {
+    return () => {
+      console.log('clearup')
+    }
+  }, [count])
+
   return (
     <div>
       {count}

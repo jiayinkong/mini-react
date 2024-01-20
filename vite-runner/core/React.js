@@ -55,6 +55,7 @@ function commitRoot() {
   // 移除旧节点
   deletions.forEach(commitDeletions)
   commitWork(wipRoot.child)
+  commitEffectHooks()
   // 在提交完当前的 wipRoot 之后，保存 wipRoot
   currentRoot = wipRoot
   // 只提交一次，提交完就置空
@@ -97,6 +98,51 @@ function commitWork(fiber) {
 
   commitWork(fiber.child)
   commitWork(fiber.sibling)
+}
+
+function commitEffectHooks() {
+  function run(fiber) {
+    if(!fiber) return 
+
+    if(!fiber.alternate) {
+      // init
+      fiber.effectHooks?.forEach(hook => {
+        hook.clearup = hook.callback()
+      })
+
+    } else {
+      // update
+      fiber.effectHooks?.forEach((newHook, index) => {
+        if(newHook.deps.length > 0) {
+          const oldHook = fiber.alternate?.effectHooks[index]
+          const needEffect = oldHook.deps.some((oldDep, i) => {
+            return oldDep !== newHook.deps[i]
+          })
+          newHook.clearup = needEffect && newHook.callback()
+        }
+      })
+    }
+
+    run(fiber.child)
+    run(fiber.sibling)
+  }
+
+
+  function runClearup(fiber) {
+    if(!fiber) return
+
+    fiber.alternate?.effectHooks?.forEach(hook => {
+      if(hook.deps.length > 0) {
+        hook.clearup()
+      }
+    })
+
+    runClearup(fiber.child)
+    runClearup(fiber.sibling)
+  }
+
+  runClearup(wipRoot)
+  run(wipRoot)
 }
 
 function createDom(type) {
@@ -197,6 +243,7 @@ function updateFunctionComponent(fiber) {
   wipFiber = fiber
   stateHooks = []
   stateHookIndex = 0
+  effectHooks = []
 
   const children = [fiber.type(fiber.props)]
   reconcileChildren(fiber, children)
@@ -303,9 +350,22 @@ function useState(initial) {
   return [stateHook.state, setState]
 }
 
+let effectHooks
+function useEffect(callback, deps) {
+  const effectHook = {
+    callback,
+    deps,
+    clearup: null
+  }
+
+  effectHooks.push(effectHook)
+  wipFiber.effectHooks = effectHooks
+}
+
 export {
   render,
   createElement,
   update,
   useState,
+  useEffect,
 }
