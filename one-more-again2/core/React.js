@@ -11,16 +11,16 @@ function render(el, container) {
   nextWorkOfUnit =  wipRoot
 }
 
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)]
+  reconcileChildren(fiber, children)
+}
 
-function performWorkOfUnit(fiber) {
+function updateHostComponent(fiber) {
+
   // 创建 dom
   if(!fiber.dom) {
-    const dom = (fiber.dom = fiber.type === 'TEXT_ELEMENT'
-      ? document.createTextNode('')
-      : document.createElement(fiber.type))
-
-    // // 添加 dom 到 容器
-    // fiber.parent.dom.append(fiber.dom)
+    const dom = (fiber.dom = createDom(fiber))
 
     // 处理 props
     Object.keys(fiber.props).forEach((key) => {
@@ -31,9 +31,19 @@ function performWorkOfUnit(fiber) {
   }
 
   const children = fiber.props.children
-  let prevChild = null
-  children.forEach((child, index) => {
+  reconcileChildren(fiber, children)
+}
 
+function createDom(fiber) {
+  return fiber.type === 'TEXT_ELEMENT'
+      ? document.createTextNode('')
+      : document.createElement(fiber.type)
+}
+
+function reconcileChildren(fiber, children) {
+  let prevChild = null
+
+  children.forEach((child, index) => {
     let newFiber = {
       type: child.type,
       props: child.props,
@@ -50,17 +60,36 @@ function performWorkOfUnit(fiber) {
     }
     prevChild = newFiber
   })
+}
+
+function performWorkOfUnit(fiber) {
+  const isFunctionComponent = typeof fiber.type === 'function'
+
+  if(isFunctionComponent) {
+    updateFunctionComponent(fiber)
+  } else {
+    updateHostComponent(fiber)
+  }
 
   // 链表指针指向下一个节点
   if(fiber.child) {
     return fiber.child
   }
 
-  if(fiber.sibling) {
-    return fiber.sibling
-  }
+  // if(fiber.sibling) {
+  //   return fiber.sibling
+  // }
 
-  return fiber.parent?.sibling
+  // return fiber.parent?.sibling
+
+  // 多个函数组件相邻，因为函数组件的fiber没有sibling属性，需要向上寻找有 sibling 属性的节点指向下一个节点
+  let newFiber = fiber
+  while(newFiber) {
+    if(newFiber.sibling) {
+      return newFiber.sibling
+    }
+    newFiber = newFiber.parent
+  }
 }
 
 function commitRoot() {
@@ -71,7 +100,16 @@ function commitRoot() {
 function commitWork(fiber) {
   if(!fiber) return
 
-  fiber.parent.dom.append(fiber.dom)
+  // 区分函数组件节点和普通节点，因为函数组件不存在 fiber.dom
+  // 所以其孩子节点需要向上寻找有 fiber.dom 的祖先节点进行 append
+  let fiberParent = fiber.parent
+  while(!fiberParent.dom) {
+    fiberParent = fiberParent.parent
+  }
+
+  if(fiber.dom) {
+    fiberParent.dom.append(fiber.dom)
+  }
 
   commitWork(fiber.child)
   commitWork(fiber.sibling)
@@ -111,9 +149,10 @@ function createElement(type, props, ...children) {
     type,
     props: {
       ...props,
-      children: children.map((child) =>
-        typeof child === "string" ? createTextNode(child) : child
-      ),
+      children: children.map((child) => {
+        const isTextNode = typeof child === 'string' || typeof child === 'number'
+        return isTextNode ? createTextNode(child) : child
+      }),
     },
   }
 }
