@@ -1,12 +1,14 @@
 let nextWorkOfUnit = null
+let wipRoot = null
 
 function render(el, container) {
-  nextWorkOfUnit = {
+  wipRoot = {
     dom: container,
     props: {
       children: [el],
     }
   }
+  nextWorkOfUnit =  wipRoot
 }
 
 
@@ -17,8 +19,8 @@ function performWorkOfUnit(fiber) {
       ? document.createTextNode('')
       : document.createElement(fiber.type))
 
-    // 添加 dom 到 容器
-    fiber.parent.dom.append(fiber.dom)
+    // // 添加 dom 到 容器
+    // fiber.parent.dom.append(fiber.dom)
 
     // 处理 props
     Object.keys(fiber.props).forEach((key) => {
@@ -61,6 +63,20 @@ function performWorkOfUnit(fiber) {
   return fiber.parent?.sibling
 }
 
+function commitRoot() {
+  commitWork(wipRoot.child)
+  wipRoot =  null
+}
+
+function commitWork(fiber) {
+  if(!fiber) return
+
+  fiber.parent.dom.append(fiber.dom)
+
+  commitWork(fiber.child)
+  commitWork(fiber.sibling)
+}
+
 function workLoop(deadline) {
   let shouldYeild = false
 
@@ -68,6 +84,11 @@ function workLoop(deadline) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit)
 
     shouldYeild = deadline.timeRemaining() < 1
+  }
+
+  // 完成所有节点的链表结构转换后，统一添加
+  if(!nextWorkOfUnit && wipRoot) {
+    commitRoot()
   }
 
   requestIdleCallback(workLoop)
