@@ -1,25 +1,79 @@
+let nextWorkOfUnit = null
+
 function render(el, container) {
-  // 1. 创建 dom
-  const dom = el.type === 'TEXT_ELEMENT'
-      ? document.createTextNode('')
-      : document.createElement(el.type)
-
-  // 2. 处理 props
-  Object.keys(el.props).forEach((key) => {
-    if (key !== 'children') {
-      dom[key] = el.props[key]
+  nextWorkOfUnit = {
+    dom: container,
+    props: {
+      children: [el],
     }
-  })
-
-  // 3. 递归 children
-  const children = el.props.children
-  children.forEach(child => {
-    render(child, dom)
-  })
-
-  // 4. 添加 dom 到容器
-  container.append(dom)
+  }
 }
+
+
+function performWorkOfUnit(fiber) {
+  // 创建 dom
+  if(!fiber.dom) {
+    const dom = (fiber.dom = fiber.type === 'TEXT_ELEMENT'
+      ? document.createTextNode('')
+      : document.createElement(fiber.type))
+
+    // 添加 dom 到 容器
+    fiber.parent.dom.append(fiber.dom)
+
+    // 处理 props
+    Object.keys(fiber.props).forEach((key) => {
+      if (key !== 'children') {
+        dom[key] = fiber.props[key]
+      }
+    })
+  }
+
+  const children = fiber.props.children
+  let prevChild = null
+  children.forEach((child, index) => {
+
+    let newFiber = {
+      type: child.type,
+      props: child.props,
+      dom: null,
+      parent: fiber,
+      child: null,
+      sibling: null,
+    }
+
+    if(index === 0) {
+      fiber.child = newFiber
+    } else {
+      prevChild.sibling = newFiber
+    }
+    prevChild = newFiber
+  })
+
+  // 链表指针指向下一个节点
+  if(fiber.child) {
+    return fiber.child
+  }
+
+  if(fiber.sibling) {
+    return fiber.sibling
+  }
+
+  return fiber.parent?.sibling
+}
+
+function workLoop(deadline) {
+  let shouldYeild = false
+
+  while(!shouldYeild && nextWorkOfUnit) {
+    nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit)
+
+    shouldYeild = deadline.timeRemaining() < 1
+  }
+
+  requestIdleCallback(workLoop)
+}
+
+requestIdleCallback(workLoop)
 
 function createTextNode(text) {
   return {
