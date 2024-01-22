@@ -5,6 +5,7 @@ let deletions = []
 let wipFiber = [] // 用于指向当前更新的函数组件根节点
 let stateHooks // 用于存储 stateHook
 let stateHookIndex // 用于记录当前 stateHook 的 index
+let effectHooks // 用于存储 useEffect 的 effectHook
 
 function render(el, container) {
   wipRoot = {
@@ -70,10 +71,26 @@ function useState(initial) {
   return [stateHook.state, setState]
 }
 
+function useEffect(callback, deps) {
+
+  const effectHook = {
+    callback,
+    deps,
+    clearup: null,
+  }
+
+  effectHooks.push(effectHook)
+
+  // 不需要重新设置 nextWorkOfUnit，
+  // 直接把 effectHooks 绑定到当前的函数组件 wipFiber
+  wipFiber.effectHooks = effectHooks 
+}
+
 function updateFunctionComponent(fiber) {
   wipFiber = fiber
   stateHooks = [] // 每次调用函数组件，先清空
   stateHookIndex = 0 // 先置0
+  effectHooks = [] // 每次调用函数组件，先清空
 
   const children = [fiber.type(fiber.props)]
   reconcileChildren(fiber, children)
@@ -172,6 +189,7 @@ function reconcileChildren(fiber, children) {
       oldFiber = oldFiber.sibling
     }
 
+    // 初始化 child、sibling
     if(index === 0) {
       fiber.child = newFiber
     } else {
@@ -220,6 +238,7 @@ function performWorkOfUnit(fiber) {
 function commitRoot() {
   deletions.forEach(commitDeletions) // 在 commitWork 之前先删除oldFiber
   commitWork(wipRoot.child)
+  commitEffectHooks() // 在React完成对DOM的渲染后，并且浏览器完成绘制之前
   currentRoot = wipRoot
   wipRoot =  null
   deletions = [] // 完成一次提交，需要清空这一轮的旧节点集合
@@ -260,6 +279,53 @@ function commitWork(fiber) {
 
   commitWork(fiber.child)
   commitWork(fiber.sibling)
+}
+
+function commitEffectHooks() {
+  function run(fiber) {
+    if(!fiber) return
+
+    // 初始化
+    if(!fiber.alternate) {
+      fiber.effectHooks?.forEach(hook => {
+        hook.clearup = hook.callback()
+      })
+    
+    // update
+    } else {
+      fiber.effectHooks?.forEach((newHook, index) => {
+        if(newHook.deps.length > 0) {
+          const oldHook = fiber.alternate?.effectHooks?.[index]
+
+          const needEffect = oldHook.deps.some((oldDep, i) => {
+            return oldDep !== newHook.deps[i]
+          })
+
+          if(needEffect) {
+            newHook.clearup = newHook.callback()
+          }
+        }
+      })
+    }
+
+    run(fiber.child)
+    run(fiber.sibling)
+  }
+
+  function runClearup(fiber) {
+    if(!fiber) return
+
+    // 执行 alternate 的 clearup
+    fiber.alternate?.effectHooks?.forEach(hook => {
+      hook.clearup?.()
+    })
+
+    runClearup(fiber.child)
+    runClearup(fiber.sibling)
+  }
+
+  runClearup(wipRoot)
+  run(wipRoot)
 }
 
 function workLoop(deadline) {
@@ -312,6 +378,7 @@ const React = {
   render,
   update,
   useState,
+  useEffect,
   createElement,
 }
 

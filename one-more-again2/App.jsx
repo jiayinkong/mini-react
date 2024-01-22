@@ -6,6 +6,17 @@ function App() {
   const [count, setCount] = React.useState(10)
   const [name, setName] = React.useState('TOM')
 
+  React.useEffect(() => {
+    console.log('init')
+  }, [])
+
+  React.useEffect(() => {
+    console.log('update')
+    return () => {
+      console.log('clearup')
+    }
+  }, [])
+
 
   function handleClick() {
     setName( 'Tom Jerry')
