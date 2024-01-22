@@ -3,6 +3,8 @@ let wipRoot = null
 let currentRoot = null // 用于更新 dom
 let deletions = []
 let wipFiber = [] // 用于指向当前更新的函数组件根节点
+let stateHooks // 用于存储 stateHook
+let stateHookIndex // 用于记录当前 stateHook 的 index
 
 function render(el, container) {
   wipRoot = {
@@ -28,8 +30,50 @@ function update() {
   }
 }
 
+function useState(initial) {
+  const currentFiber = wipFiber
+  const oldHook = currentFiber.alternate?.stateHooks[stateHookIndex]
+
+  const stateHook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: oldHook ? oldHook.queue : [],
+  }
+
+  stateHook.queue.forEach(action => {
+    const eagerState = typeof action === 'function' ? action(stateHook.state) : action
+
+    if(eagerState != stateHook.state) {
+      stateHook.state = action(stateHook.state)
+    }
+  })
+
+  stateHooks.push(stateHook)
+  stateHookIndex++
+  stateHook.queue = [] // 遍调用完清空
+
+  currentFiber.stateHooks = stateHooks
+
+  function setState(action) {
+    // stateHook.state = action(stateHook.state)
+    stateHook.queue.push(typeof action === 'function' ? action : () => action)
+
+    // 需要更新 wipRoot，nextWorkOfUnit，
+    // 以重新调用函数组件->调用useState->更新 state
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber,
+    }
+
+    nextWorkOfUnit = wipRoot
+  }
+
+  return [stateHook.state, setState]
+}
+
 function updateFunctionComponent(fiber) {
   wipFiber = fiber
+  stateHooks = [] // 每次调用函数组件，先清空
+  stateHookIndex = 0 // 先置0
 
   const children = [fiber.type(fiber.props)]
   reconcileChildren(fiber, children)
@@ -267,6 +311,7 @@ function createElement(type, props, ...children) {
 const React = {
   render,
   update,
+  useState,
   createElement,
 }
 
