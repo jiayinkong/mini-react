@@ -2,6 +2,7 @@ let nextWorkOfUnit = null
 let wipRoot = null
 let currentRoot = null // 用于更新 dom
 let deletions = []
+let wipFiber = [] // 用于指向当前更新的函数组件根节点
 
 function render(el, container) {
   wipRoot = {
@@ -14,15 +15,22 @@ function render(el, container) {
 }
 
 function update() {
-  wipRoot = {
-    dom: currentRoot.dom,
-    props: currentRoot.props,
-    alternate: currentRoot // 后备指针，指向上一次的 root（currentRoot，在 commitWork 之后被赋值了）
+  const currentFiber = wipFiber
+
+
+  return () => {
+    wipRoot = {
+      ...currentFiber,
+      alternate: currentFiber,
+    }
+
+    nextWorkOfUnit = wipRoot
   }
-  nextWorkOfUnit = wipRoot
 }
 
 function updateFunctionComponent(fiber) {
+  wipFiber = fiber
+
   const children = [fiber.type(fiber.props)]
   reconcileChildren(fiber, children)
 }
@@ -215,6 +223,10 @@ function workLoop(deadline) {
 
   while(!shouldYeild && nextWorkOfUnit) {
     nextWorkOfUnit = performWorkOfUnit(nextWorkOfUnit)
+
+    if(wipRoot.sibling?.type === nextWorkOfUnit?.type) {
+      nextWorkOfUnit = undefined
+    }
 
     shouldYeild = deadline.timeRemaining() < 1
   }

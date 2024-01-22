@@ -1,36 +1,60 @@
 import React from './core/React.js'
 
-let count = 1
-let props = { id: 'foo' }
-let bar = <div>bar</div>
-let show = false
 function Foo() {
-  let foo = <div>foo</div>
+  console.log('foo function component')
+
+  const update = React.update()
 
   function handleClick() {
-    count++
-    props = { className: 'foo' }
-    show = !show
-    console.log('foo click count: ', count)
-    React.update()
+    console.log('foo click')
+    update()
   }
+
   return (
-    <div {...props}>
-      {show ? foo : bar}
+    <div id="foo">
+      <h1>Foo</h1>
       <button onClick={handleClick}>foo click</button>
     </div>
   )
 }
 
-function AppContainer() {
+function Bar() {
+  console.log('bar function component')
+  const update = React.update()
+
+  function handleClick() {
+    console.log('bar click')
+    update()
+  }
+
   return (
-    <div id="app">
-      <h1>App</h1>
-      <Foo />
+    <div id="bar">
+      <h1>Bar</h1>
+      <button onClick={handleClick}>bar click</button>
     </div>
   )
 }
 
-const App = AppContainer()
+function App() {
+  console.log('app function component')
+  const update = React.update()
+
+
+  function handleClick() {
+    console.log('app click')
+    update()
+  }
+
+  return (
+    <div id="app">
+      <h1>App</h1>
+      <button onClick={handleClick}>app click</button>
+
+      <Foo />
+
+      <Bar />
+    </div>
+  )
+}
 
 export default App
