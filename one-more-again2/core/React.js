@@ -1,5 +1,7 @@
 let nextWorkOfUnit = null
 let wipRoot = null
+let currentRoot = null // 用于更新 dom
+let deletions = []
 
 function render(el, container) {
   wipRoot = {
@@ -9,6 +11,15 @@ function render(el, container) {
     }
   }
   nextWorkOfUnit =  wipRoot
+}
+
+function update() {
+  wipRoot = {
+    dom: currentRoot.dom,
+    props: currentRoot.props,
+    alternate: currentRoot // 后备指针，指向上一次的 root（currentRoot，在 commitWork 之后被赋值了）
+  }
+  nextWorkOfUnit = wipRoot
 }
 
 function updateFunctionComponent(fiber) {
@@ -23,11 +34,7 @@ function updateHostComponent(fiber) {
     const dom = (fiber.dom = createDom(fiber))
 
     // 处理 props
-    Object.keys(fiber.props).forEach((key) => {
-      if (key !== 'children') {
-        dom[key] = fiber.props[key]
-      }
-    })
+    updateProps(dom, fiber.props, {})
   }
 
   const children = fiber.props.children
@@ -40,17 +47,77 @@ function createDom(fiber) {
       : document.createElement(fiber.type)
 }
 
+function updateProps(dom, nextProps, prevProps) {
+  Object.keys(prevProps).forEach(key => {
+    if(key !== 'children') {
+      // 旧有新无，删除
+      if(!(key in nextProps)) {
+        dom.removeAttribute(key)
+      }
+    }
+  })
+
+  
+  Object.keys(nextProps).forEach((key) => {
+    if (key !== 'children') {
+      // 新有旧有，修改；新有旧无，新增
+      if(nextProps[key] !== prevProps[key]) {
+        // 绑定事件
+        if(key.startsWith('on')) {
+          const eventName = key.slice(2).toLowerCase()
+          dom.removeEventListener(eventName, prevProps[key])
+          dom.addEventListener(eventName, nextProps[key])
+        
+          // 绑定 props 属性
+        } else {
+          dom[key] = nextProps[key]
+        }
+      }
+    }
+  })
+}
+
 function reconcileChildren(fiber, children) {
   let prevChild = null
+  let oldFiber = fiber.alternate?.child // 旧fiber，指向当前fiber的后备指针的child
 
   children.forEach((child, index) => {
+    // 判断新旧fiber是否同类型
+    const isSameType = oldFiber && oldFiber.type === child.type
     let newFiber = {
       type: child.type,
       props: child.props,
-      dom: null,
       parent: fiber,
       child: null,
       sibling: null,
+      
+    }
+
+    if(isSameType) {
+      newFiber = {
+        ...newFiber,
+        dom: oldFiber.dom,
+        alternate: oldFiber,
+        effectTag: 'update'
+      }
+    } else {
+      if(child) {
+        newFiber = {
+          ...newFiber,
+          dom: null,
+          effectTag: 'placement',
+        }
+      }
+
+      // !isSameType，收集oldFiber
+      if(oldFiber) {
+        deletions.push(oldFiber)
+      }
+    }
+
+    // 移动指针
+    if(oldFiber) {
+      oldFiber = oldFiber.sibling
     }
 
     if(index === 0) {
@@ -58,8 +125,20 @@ function reconcileChildren(fiber, children) {
     } else {
       prevChild.sibling = newFiber
     }
-    prevChild = newFiber
+    
+    // 如果存在 newFiber 的话才把 prevChild 更新为 newFiber
+    if(newFiber) {
+      prevChild = newFiber
+    }
   })
+
+  // 循环结束，还有 oldFiber 的话，需要收集到 deletions（旧有新无）
+  while(oldFiber) {
+    deletions.push(oldFiber)
+
+    // 移动指针指向兄弟节点
+    oldFiber = oldFiber.sibling
+  }
 }
 
 function performWorkOfUnit(fiber) {
@@ -76,12 +155,6 @@ function performWorkOfUnit(fiber) {
     return fiber.child
   }
 
-  // if(fiber.sibling) {
-  //   return fiber.sibling
-  // }
-
-  // return fiber.parent?.sibling
-
   // 多个函数组件相邻，因为函数组件的fiber没有sibling属性，需要向上寻找有 sibling 属性的节点指向下一个节点
   let newFiber = fiber
   while(newFiber) {
@@ -93,8 +166,24 @@ function performWorkOfUnit(fiber) {
 }
 
 function commitRoot() {
+  deletions.forEach(commitDeletions) // 在 commitWork 之前先删除oldFiber
   commitWork(wipRoot.child)
+  currentRoot = wipRoot
   wipRoot =  null
+  deletions = [] // 完成一次提交，需要清空这一轮的旧节点集合
+}
+
+function commitDeletions(fiber) {
+  // 函数组件
+  if(!fiber.dom) {
+    commitDeletions(fiber.child)
+  } else {
+    let fiberParent = fiber.parent
+    while(!fiberParent.dom) {
+      fiberParent = fiberParent.parent
+    }
+    fiberParent.dom.removeChild(fiber.dom)
+  }
 }
 
 function commitWork(fiber) {
@@ -107,8 +196,14 @@ function commitWork(fiber) {
     fiberParent = fiberParent.parent
   }
 
-  if(fiber.dom) {
-    fiberParent.dom.append(fiber.dom)
+  // fiber.effectTag 与 fiber.dom，优先判断 fiber.effectTag，只要是 update，就走 update 逻辑
+  if(fiber.effectTag === 'update') {
+    updateProps(fiber.dom, fiber.props, fiber.alternate?.props)
+    
+  } else if(fiber.effectTag === 'placement') {
+    if(fiber.dom) {
+      fiberParent.dom.append(fiber.dom)
+    }
   }
 
   commitWork(fiber.child)
@@ -159,6 +254,7 @@ function createElement(type, props, ...children) {
 
 const React = {
   render,
+  update,
   createElement,
 }
 

@@ -1,31 +1,32 @@
 import React from './core/React.js'
 
+let count = 1
+let props = { id: 'foo' }
+let bar = <div>bar</div>
+let show = false
 function Foo() {
+  let foo = <div>foo</div>
+
+  function handleClick() {
+    count++
+    props = { className: 'foo' }
+    show = !show
+    console.log('foo click count: ', count)
+    React.update()
+  }
   return (
-    <div>
-      Foo
-      <p>Foo content</p>
+    <div {...props}>
+      {show ? foo : bar}
+      <button onClick={handleClick}>foo click</button>
     </div>
   )
 }
 
-function Bar({ num }) {
-  return (
-    <div>
-      Bar
-      <p>Bar content</p>
-      <p>num is: {num}</p>
-    </div>
-  )
-}
-
-// const App = <div>Hello App jsx<p>child1</p></div>
 function AppContainer() {
   return (
-    <div>
+    <div id="app">
       <h1>App</h1>
       <Foo />
-      <Bar num={10} />
     </div>
   )
 }
